@@ -3,6 +3,22 @@ import User from "../models/User.js";
 import ProductStat from "../models/ProductStat.js";
 import { StatusCodes } from "http-status-codes";
 
+export const searchProducts = async (req, res) => {
+  try {
+    const { name } = req.query;
+    const filter = {};
+
+    if (name) filter.name = { $regex: name, $options: "i" };
+    const products = await Product.find(filter, { name: 1 });
+
+    return res
+      .status(StatusCodes.OK)
+      .json({ products, total: products.length });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const getProducts = async (req, res) => {
   try {
     const { category, priceRange, discount, rating } = req.query;
