@@ -24,7 +24,7 @@ const ProductSchema = mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["Hunger", "Beauty"],
+      enum: ["skin", "face", "lips", "perfumery", "household", "decorative"],
       required: true,
     },
     rating: {
