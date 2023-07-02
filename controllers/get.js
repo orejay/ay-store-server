@@ -36,7 +36,14 @@ export const getProducts = async (req, res) => {
     }
     if (rating) filter.rating = { $gte: rating };
 
-    const products = await Product.find(filter);
+    const products = await Product.find(filter, {
+      name: 1,
+      price: 1,
+      category: 1,
+      rating: 1,
+      description: 1,
+      discount: 1,
+    });
 
     return res
       .status(StatusCodes.OK)
