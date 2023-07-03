@@ -34,7 +34,10 @@ export const getProducts = async (req, res) => {
       const [minPrice, maxPrice] = priceRange.split("-");
       filter.price = { $gte: minPrice, $lte: maxPrice };
     }
-    if (rating) filter.rating = { $gte: rating };
+    if (rating) {
+      const [minRating, maxRating] = rating.split("-");
+      filter.rating = { $gte: minRating, $lte: maxRating };
+    }
 
     const products = await Product.find(filter, {
       name: 1,
