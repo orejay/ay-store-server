@@ -8,7 +8,7 @@ export const getDefaultAddress = async (req, res) => {
   try {
     const userId = req.params.id;
     const addresses = await Address.find({
-      userId: userId,
+      user: userId,
       isDefault: true,
     })[0];
 
@@ -21,7 +21,7 @@ export const getDefaultAddress = async (req, res) => {
 export const getAddress = async (req, res) => {
   try {
     const userId = req.params.id;
-    const addresses = await Address.find({ userId: userId });
+    const addresses = await Address.find({ user: userId });
 
     return res.status(StatusCodes.OK).json(addresses);
   } catch (error) {
