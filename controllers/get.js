@@ -12,7 +12,7 @@ export const getDefaultAddress = async (req, res) => {
       isDefault: true,
     });
 
-    return res.status(StatusCodes.OK).json(addresses);
+    return res.status(StatusCodes.OK).json(addresses[0]);
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
