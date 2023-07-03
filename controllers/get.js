@@ -10,7 +10,7 @@ export const getDefaultAddress = async (req, res) => {
     const addresses = await Address.find({
       user: userId,
       isDefault: true,
-    })[0];
+    });
 
     return res.status(StatusCodes.OK).json(addresses);
   } catch (error) {
