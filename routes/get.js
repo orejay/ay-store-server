@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.get("/products/search", searchProducts);
 router.get("/users", getUsers);
-router.get("/orders", getOrders);
+router.get("/orders/:id", getOrders);
 router.get("/products/filter", getProducts);
 router.get("/address/:id", getAddress);
 router.get("/address/default/:id", getDefaultAddress);
