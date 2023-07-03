@@ -2,6 +2,18 @@ import Product from "../models/Product.js";
 import User from "../models/User.js";
 import ProductStat from "../models/ProductStat.js";
 import { StatusCodes } from "http-status-codes";
+import Address from "../models/Address.js";
+
+export const getAddress = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const addresses = await Address.find({ userId: userId });
+
+    return res.status(StatusCodes.OK).json(addresses);
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
 
 export const searchProducts = async (req, res) => {
   try {
