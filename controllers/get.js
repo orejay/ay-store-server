@@ -4,6 +4,20 @@ import ProductStat from "../models/ProductStat.js";
 import { StatusCodes } from "http-status-codes";
 import Address from "../models/Address.js";
 
+export const getDefaultAddress = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const addresses = await Address.find({
+      userId: userId,
+      isDefault: true,
+    })[0];
+
+    return res.status(StatusCodes.OK).json(addresses);
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const getAddress = async (req, res) => {
   try {
     const userId = req.params.id;
