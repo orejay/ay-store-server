@@ -3,6 +3,20 @@ import User from "../models/User.js";
 import ProductStat from "../models/ProductStat.js";
 import { StatusCodes } from "http-status-codes";
 import Address from "../models/Address.js";
+import Order from "../models/Orders.js";
+
+export const getOrders = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const orders = await Order.find({
+      user: userId,
+    });
+
+    return res.status(StatusCodes.OK).json(orders);
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
 
 export const getDefaultAddress = async (req, res) => {
   try {
