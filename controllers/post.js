@@ -5,7 +5,7 @@ import Address from "../models/Address.js";
 
 export const addAddress = async (req, res) => {
   try {
-    const { data } = req.user;
+    const { id } = req.user;
     const address = req.body;
 
     const newAddress = new Address({
@@ -28,7 +28,7 @@ export const addAddress = async (req, res) => {
 export const addProduct = async (req, res) => {
   try {
     const product = req.body;
-    const { data } = req.user;
+    const { id } = req.user;
     const user = await User.findById(data);
     console.log(user);
 

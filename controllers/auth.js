@@ -5,6 +5,48 @@ import jwt from "jsonwebtoken";
 
 const saltRounds = process.env.SALT_ROUNDS;
 
+export const changePassword = async (req, res) => {
+  try {
+    const { oldPassword, password } = req.body;
+    const { id } = req.user;
+    const user = await User.find({ _id: id });
+
+    if (user.length < 1)
+      return res
+        .status(StatusCodes.BAD_REQUEST)
+        .json({ message: "user does not exist" });
+
+    const salt = await bcrypt.genSalt(saltRounds);
+    const isPassword = await bcrypt.compare(oldPassword, user[0].password);
+
+    if (!isPassword)
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ message: "Incorrect password!" });
+
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    if (isPassword) {
+      User.findByIdAndUpdate(id, { password: hashedPassword })
+        .then(() =>
+          res
+            .status(StatusCodes.OK)
+            .json({ message: `password updated successfully!` })
+        )
+        .catch((error) =>
+          res.status(StatusCodes.BAD_REQUEST).json({
+            error: error.message,
+            message: `unable to change password`,
+          })
+        );
+    }
+  } catch (error) {
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: `Unable to authenticate user! ${error.message}` });
+  }
+};
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -26,7 +68,7 @@ export const login = async (req, res) => {
         .status(StatusCodes.UNAUTHORIZED)
         .json({ message: "incorrect password!" });
 
-    const token = jwt.sign({ data: user._id }, jwtSecret, {
+    const token = jwt.sign({ id: user._id }, jwtSecret, {
       expiresIn: Number(jwtExpiration),
     });
 
@@ -88,9 +130,17 @@ export const signup = async (req, res) => {
         role: user.role,
       });
       await newUser.save();
-      res
-        .status(StatusCodes.CREATED)
-        .json({ message: `user created successfully!`, newUser });
+      res.status(StatusCodes.CREATED).json({
+        message: `user created successfully!`,
+        userData: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          role: user.role,
+        },
+      });
     }
   } catch (error) {
     console.log(`unable to add user ${error.message}`);
