@@ -18,6 +18,19 @@ export const getOrders = async (req, res) => {
   }
 };
 
+export const getAddresses = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const addresses = await Address.find({
+      user: id,
+    });
+
+    return res.status(StatusCodes.OK).json(addresses);
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const getDefaultAddress = async (req, res) => {
   try {
     const userId = req.params.id;

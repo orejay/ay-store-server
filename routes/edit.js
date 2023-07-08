@@ -4,14 +4,22 @@ import {
   editProduct,
   editAddress,
   deleteAddress,
+  editUser,
+  setAsDefaultAddress,
 } from "../controllers/edit.js";
 import authenticateToken from "../middleware/authenticateToken.js";
 
 const router = express.Router();
 
 router.patch("/products/:id", authenticateToken, editProduct);
+router.patch(
+  "/addresses/set-default/:id",
+  authenticateToken,
+  setAsDefaultAddress
+);
 router.delete("/products/:id", authenticateToken, deleteProduct);
-router.patch("/address/:id", authenticateToken, editAddress);
-router.delete("/address/:id", authenticateToken, deleteAddress);
+router.patch("/user", authenticateToken, editUser);
+router.patch("/addresses/:id", authenticateToken, editAddress);
+router.delete("/addresses/:id", authenticateToken, deleteAddress);
 
 export default router;

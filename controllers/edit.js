@@ -1,7 +1,103 @@
 import Address from "../models/Address.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
+import jwt from "jsonwebtoken";
 import { StatusCodes } from "http-status-codes";
+
+export const setAsDefaultAddress = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const addressId = req.params.id;
+
+    const isAddress = Address.findOne({ _id: addressId });
+
+    if (isAddress) {
+      const defaultAddress = await Address.findOne({
+        user: id,
+        isDefault: true,
+      });
+
+      if (defaultAddress) {
+        Address.findByIdAndUpdate(defaultAddress._id, { isDefault: false })
+          .then(() => console.log("updated old address", true))
+          .catch((error) =>
+            res.status(StatusCodes.BAD_REQUEST).json({
+              error: error.message,
+              message: `address does not exist!`,
+            })
+          );
+      }
+
+      Address.findByIdAndUpdate(addressId, { isDefault: true })
+        .then(() =>
+          res
+            .status(StatusCodes.OK)
+            .json({ message: `Address Updated Successfully!` })
+        )
+        .catch((error) =>
+          res.status(StatusCodes.BAD_REQUEST).json({
+            error: error.message,
+            message: `address does not exist!`,
+          })
+        );
+    }
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const editUser = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const isUser = await User.find({ _id: id });
+    const { firstName, lastName, email, phoneNumber } = req.body;
+    const jwtExpiration = process.env.JWT_EXPIRATION;
+    const jwtSecret = process.env.JWT_SECRET;
+    const token = jwt.sign({ id: id }, jwtSecret, {
+      expiresIn: Number(jwtExpiration),
+    });
+    const filter = {};
+
+    if (firstName !== "") filter.firstName = firstName;
+
+    if (lastName !== "") filter.lastName = lastName;
+
+    if (email !== "") filter.email = email;
+
+    if (phoneNumber !== "") filter.phoneNumber = phoneNumber;
+
+    if (isUser.length < 1)
+      return res
+        .status(StatusCodes.BAD_REQUEST)
+        .json({ message: "User does not exist!" });
+
+    if (isUser.length >= 1) {
+      User.findByIdAndUpdate(id, filter)
+        .then(() =>
+          res.status(StatusCodes.OK).json({
+            message: `user updated successfully!`,
+            userData: {
+              firstName: isUser[0].firstName,
+              lastName: isUser[0].lastName,
+              email: isUser[0].email,
+              phoneNumber: isUser[0].phoneNumber,
+              role: isUser[0].role,
+              id: id,
+              token: token,
+            },
+          })
+        )
+        .catch((error) =>
+          res.status(StatusCodes.BAD_REQUEST).json({
+            error: error.message,
+            message: `address does not exist!`,
+          })
+        );
+    }
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
 
 export const deleteAddress = async (req, res) => {
   try {
@@ -30,12 +126,48 @@ export const deleteAddress = async (req, res) => {
 
 export const editAddress = async (req, res) => {
   try {
-    const id = req.params.id;
-    const address = req.body;
-    const isAddress = await Address.find({ _id: id });
+    const { id } = req.user;
+    const addressId = req.params.id;
+    const {
+      contactName,
+      phoneNumber,
+      address,
+      country,
+      state,
+      city,
+      isDefault,
+    } = req.body;
+    const filter = {};
 
-    if (isAddress.length >= 1) {
-      Address.findByIdAndUpdate(id, address)
+    if (contactName !== "") filter.contactName = contactName;
+    if (address !== "") filter.address = address;
+    if (country !== "") filter.country = country;
+    if (phoneNumber !== "") filter.phoneNumber = phoneNumber;
+    if (state !== "") filter.state = state;
+    if (city !== "") filter.city = city;
+    if (isDefault) {
+      const defaultAddress = await Address.findOne({
+        user: id,
+        isDefault: true,
+      });
+
+      if (defaultAddress) {
+        Address.findByIdAndUpdate(defaultAddress._id, { isDefault: false })
+          .then(() => console.log("updated", true))
+          .catch((error) =>
+            res.status(StatusCodes.BAD_REQUEST).json({
+              error: error.message,
+              message: `address does not exist!`,
+            })
+          );
+      }
+    }
+    filter.isDefault = isDefault;
+
+    const isAddress = await Address.findOne({ _id: addressId });
+
+    if (isAddress) {
+      Address.findByIdAndUpdate(addressId, filter)
         .then((address) =>
           res
             .status(StatusCodes.OK)

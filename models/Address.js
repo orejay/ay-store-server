@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 
 const AddressSchema = mongoose.Schema(
   {
+    contactName: String,
+    phoneNumber: String,
     address: {
       type: String,
       min: 2,

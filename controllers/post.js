@@ -8,13 +8,33 @@ export const addAddress = async (req, res) => {
     const { id } = req.user;
     const address = req.body;
 
+    if (address.isDefault) {
+      const defaultAddress = await Address.findOne({
+        user: id,
+        isDefault: true,
+      });
+
+      if (defaultAddress) {
+        Address.findByIdAndUpdate(defaultAddress._id, { isDefault: false })
+          .then(() => console.log("updated", true))
+          .catch((error) =>
+            res.status(StatusCodes.BAD_REQUEST).json({
+              error: error.message,
+              message: `address does not exist!`,
+            })
+          );
+      }
+    }
+
     const newAddress = new Address({
+      contactName: address.contactName,
+      phoneNumber: address.phoneNumber,
       address: address.address,
       city: address.city,
       state: address.state,
       country: address.country,
       isDefault: address.isDefault,
-      user: data,
+      user: id,
     });
     await newAddress.save();
     return res
