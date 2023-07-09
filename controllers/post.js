@@ -48,9 +48,9 @@ export const addAddress = async (req, res) => {
 export const addProduct = async (req, res) => {
   try {
     const product = req.body;
+
     const { id } = req.user;
-    const user = await User.findById(data);
-    console.log(user);
+    const user = await User.findById(id);
 
     if (!["superadmin", "admin"].includes(user.role))
       return res.status(StatusCodes.UNAUTHORIZED).json({
@@ -66,7 +66,17 @@ export const addProduct = async (req, res) => {
         .status(StatusCodes.CONFLICT)
         .json({ message: `${product.name} already exists!` });
 
-    const newProduct = new Product(product);
+    const newProduct = new Product({
+      name: product.name,
+      price: Number(product.price),
+      imageName: req.file.filename,
+      imagePath: req.file.path,
+      discount: Number(product.discount),
+      description: product.description,
+      category: product.category,
+      rating: 0,
+      supply: Number(product.supply),
+    });
 
     await newProduct.save();
     return res.status(StatusCodes.CREATED).json({

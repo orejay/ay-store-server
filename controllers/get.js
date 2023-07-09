@@ -99,6 +99,8 @@ export const getProducts = async (req, res) => {
       rating: 1,
       description: 1,
       discount: 1,
+      imageName: 1,
+      imagePath: 1,
     });
 
     return res

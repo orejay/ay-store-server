@@ -10,10 +10,8 @@ const ProductSchema = mongoose.Schema(
       type: Number,
       required: true,
     },
-    image: {
-      data: Buffer,
-      contentType: String,
-    },
+    imageName: String,
+    imagePath: String,
     discount: {
       type: Number,
       default: 0,
