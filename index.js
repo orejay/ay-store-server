@@ -9,6 +9,8 @@ import getRoutes from "./routes/get.js";
 import postRoutes from "./routes/post.js";
 import authRoutes from "./routes/auth.js";
 import editRoutes from "./routes/edit.js";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
 /* Configurations */
 dotenv.config();
@@ -26,6 +28,9 @@ app.use("/api/v1/get", getRoutes);
 app.use("/api/v1/post", postRoutes);
 app.use("/api/v1/edit", editRoutes);
 app.use("/api/v1/auth", authRoutes);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+app.use("/uploads", express.static(join(__dirname, "public/uploads")));
 
 /* Initialization */
 const PORT = process.env.PORT || 5050;
