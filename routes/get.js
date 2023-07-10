@@ -16,7 +16,7 @@ const router = express.Router();
 router.get("/products/search", searchProducts);
 router.get("/users", getUsers);
 router.get("/orders/:id", getOrders);
-router.get("/products/filter", getProducts);
+router.get("/products/filter", authenticateToken, getProducts);
 router.get("/addresses/:id", getAddress);
 router.get("/addresses", authenticateToken, getAddresses);
 router.get("/addresses/default/:id", getDefaultAddress);

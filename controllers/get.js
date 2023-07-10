@@ -101,6 +101,7 @@ export const getProducts = async (req, res) => {
       discount: 1,
       imageName: 1,
       imagePath: 1,
+      supply: 1,
     });
 
     return res

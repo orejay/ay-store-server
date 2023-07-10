@@ -8,10 +8,16 @@ import {
   setAsDefaultAddress,
 } from "../controllers/edit.js";
 import authenticateToken from "../middleware/authenticateToken.js";
+import upload from "../middleware/imageUpload.js";
 
 const router = express.Router();
 
-router.patch("/products/:id", authenticateToken, editProduct);
+router.patch(
+  "/products/:id",
+  authenticateToken,
+  upload.single("image"),
+  editProduct
+);
 router.patch(
   "/addresses/set-default/:id",
   authenticateToken,
