@@ -82,7 +82,8 @@ export const getProducts = async (req, res) => {
 
       filter.category = { $in: categories };
     }
-    if (discount) filter.discount = { $gte: 1 };
+    if (discount === "true") filter.discount = { $gte: 1 };
+    console.log(discount);
     if (priceRange) {
       const [minPrice, maxPrice] = priceRange.split("-");
       filter.price = { $gte: minPrice, $lte: maxPrice };

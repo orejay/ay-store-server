@@ -9,6 +9,7 @@ const OrdersSchema = mongoose.Schema({
     },
   ],
   address: String,
+  instructions: String,
   status: {
     type: String,
     enum: ["new", "processing", "shipped", "delivered", "completed"],

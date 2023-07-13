@@ -5,6 +5,14 @@ import jwt from "jsonwebtoken";
 
 const saltRounds = process.env.SALT_ROUNDS;
 
+export const auth = async (req, res) => {
+  try {
+    return res.status(StatusCodes.OK).json({ message: "Token still active!" });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const changePassword = async (req, res) => {
   try {
     const { oldPassword, password } = req.body;
