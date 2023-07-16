@@ -4,13 +4,63 @@ import ProductStat from "../models/ProductStat.js";
 import { StatusCodes } from "http-status-codes";
 import Address from "../models/Address.js";
 import Order from "../models/Orders.js";
+import axios from "axios";
+
+export const veryPaystack = async (req, res) => {
+  try {
+    const ref = req.params.ref;
+    const secretKey = process.env.PAYSTACK_SECRET;
+
+    const url = `https://api.paystack.co/transaction/verify/${ref}`;
+    const authorization = `Bearer ${secretKey}`;
+
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: authorization,
+        },
+      });
+
+      console.log(response.data);
+      return res.status(StatusCodes.OK).json({ data: response.data });
+    } catch (error) {
+      console.error(error);
+    }
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const getAllOrders = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const status = req.params.status;
+
+    const user = await User.findOne({ _id: id });
+
+    if (!["admin", "superadmin"].includes(user.role))
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ message: "Unauthorized to perform this action" });
+
+    const orders = await Order.find({ status: status })
+      .populate("address")
+      .populate("order.productId");
+
+    return res.status(StatusCodes.OK).json(orders);
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
 
 export const getOrders = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const { id } = req.user;
     const orders = await Order.find({
-      user: userId,
-    });
+      userId: id,
+    })
+      .populate("address")
+      .populate("order.productId");
 
     return res.status(StatusCodes.OK).json(orders);
   } catch (error) {
@@ -128,9 +178,18 @@ export const getProductsByCategory = async (req, res) => {
 
 export const getUsers = async (req, res) => {
   try {
+    const { id } = req.user;
+
+    const user = await User.findOne({ _id: id });
+
+    if (!["admin", "superadmin"].includes(user.role))
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ message: "Unauthorized to perform this action" });
+
     const users = await User.find().select("-password");
 
-    return res.status(StatusCodes.OK).json({ users, total: users.length });
+    return res.status(StatusCodes.OK).json(users);
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }

@@ -6,13 +6,71 @@ import { StatusCodes } from "http-status-codes";
 import { promises as fsPromises } from "fs";
 import { fileURLToPath } from "url";
 import path, { dirname, join } from "path";
+import Order from "../models/Orders.js";
+
+export const updateStatus = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const orderId = req.params.id;
+    const { status } = req.body;
+
+    const user = await User.findOne({ _id: id });
+
+    if (!["admin", "superadmin"].includes(user.role))
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ message: "Unauthorized to perform this action" });
+
+    if (status !== "") {
+      Order.findByIdAndUpdate(orderId, { status: status })
+        .then(() =>
+          res.status(StatusCodes.OK).json({ message: "Successfully Updated" })
+        )
+        .catch((error) =>
+          res.status(StatusCodes.BAD_REQUEST).json({
+            error: error.message,
+            message: `address does not exist!`,
+          })
+        );
+    } else {
+      return res
+        .status(StatusCodes.BAD_REQUEST)
+        .json({ message: "Status cannot be empty" });
+    }
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const orderId = req.params.id;
+
+    const isOrder = await Order.findOne({ _id: orderId });
+
+    if (isOrder) {
+      Order.findByIdAndDelete(orderId)
+        .then(() =>
+          res
+            .status(StatusCodes.OK)
+            .json({ message: `order deleted successfully!` })
+        )
+        .catch((error) =>
+          res.status(StatusCodes.BAD_REQUEST).json({ message: error.message })
+        );
+    }
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
 
 export const setAsDefaultAddress = async (req, res) => {
   try {
     const { id } = req.user;
     const addressId = req.params.id;
 
-    const isAddress = Address.findOne({ _id: addressId });
+    const isAddress = await Address.findOne({ _id: addressId });
 
     if (isAddress) {
       const defaultAddress = await Address.findOne({

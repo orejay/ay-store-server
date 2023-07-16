@@ -6,6 +6,8 @@ import {
   deleteAddress,
   editUser,
   setAsDefaultAddress,
+  cancelOrder,
+  updateStatus,
 } from "../controllers/edit.js";
 import authenticateToken from "../middleware/authenticateToken.js";
 import upload from "../middleware/imageUpload.js";
@@ -25,7 +27,9 @@ router.patch(
 );
 router.delete("/products/:id", authenticateToken, deleteProduct);
 router.patch("/user", authenticateToken, editUser);
+router.patch("/orders/:id", authenticateToken, updateStatus);
 router.patch("/addresses/:id", authenticateToken, editAddress);
 router.delete("/addresses/:id", authenticateToken, deleteAddress);
+router.delete("/orders/:id", authenticateToken, cancelOrder);
 
 export default router;

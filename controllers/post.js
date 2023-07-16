@@ -2,6 +2,45 @@ import Product from "../models/Product.js";
 import { StatusCodes } from "http-status-codes";
 import User from "../models/User.js";
 import Address from "../models/Address.js";
+import Order from "../models/Orders.js";
+import PaystackPayments from "../models/PaystackPayments.js";
+
+export const placeOrder = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const { order, address, instructions, price, ref } = req.body;
+    const products = [];
+
+    for (let i = 0; i < order.length; i++) {
+      const item = {};
+      item.productId = order[i]._id;
+      item.quantity = order[i].quantity;
+      products.push(item);
+    }
+
+    const newOrder = new Order({
+      userId: id,
+      order: products,
+      price: price,
+      address: address._id,
+      instructions: instructions,
+    });
+
+    await newOrder.save();
+
+    const newPaystackPayment = new PaystackPayments({
+      userId: id,
+      orderId: newOrder._id,
+      paymentRef: ref,
+    });
+
+    await newPaystackPayment.save();
+
+    return res.status(StatusCodes.CREATED).json({ newOrder });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
 
 export const addAddress = async (req, res) => {
   try {
