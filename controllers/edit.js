@@ -50,6 +50,19 @@ export const cancelOrder = async (req, res) => {
     const isOrder = await Order.findOne({ _id: orderId });
 
     if (isOrder) {
+      const order = isOrder.order;
+      for (let i = 0; i < order.length; i++) {
+        const product = await Product.findOne({ _id: order[i].product });
+        Product.findByIdAndUpdate(product._id, {
+          supply: Number(product.supply) + Number(order[i].quantity),
+        }).catch((error) =>
+          res.status(StatusCodes.BAD_REQUEST).json({
+            error: error.message,
+            message: `${prod.name} does not exist!`,
+          })
+        );
+      }
+
       Order.findByIdAndDelete(orderId)
         .then(() =>
           res
@@ -127,6 +140,23 @@ export const editUser = async (req, res) => {
 
     if (phoneNumber !== "") filter.phoneNumber = phoneNumber;
 
+    const emailExists = await User.find({
+      email: { $regex: `^${email}$`, $options: "i" },
+    });
+
+    const phoneNumberExists = await User.find({
+      phoneNumber: phoneNumber,
+    });
+
+    if (emailExists.length >= 1 || phoneNumberExists.length >= 1)
+      return res.status(StatusCodes.CONFLICT).json({
+        message: `${
+          emailExists.length >= 1
+            ? `This email is already in use`
+            : `This phone number is already in use`
+        }`,
+      });
+
     if (isUser.length < 1)
       return res
         .status(StatusCodes.BAD_REQUEST)
@@ -138,10 +168,11 @@ export const editUser = async (req, res) => {
           res.status(StatusCodes.OK).json({
             message: `user updated successfully!`,
             userData: {
-              firstName: isUser[0].firstName,
-              lastName: isUser[0].lastName,
-              email: isUser[0].email,
-              phoneNumber: isUser[0].phoneNumber,
+              firstName: firstName === "" ? isUser[0].firstName : firstName,
+              lastName: lastName === "" ? isUser[0].lastName : lastName,
+              email: email === "" ? isUser[0].email : email,
+              phoneNumber:
+                phoneNumber === "" ? isUser[0].phoneNumber : phoneNumber,
               role: isUser[0].role,
               id: id,
               token: token,
@@ -151,7 +182,6 @@ export const editUser = async (req, res) => {
         .catch((error) =>
           res.status(StatusCodes.BAD_REQUEST).json({
             error: error.message,
-            message: `address does not exist!`,
           })
         );
     }

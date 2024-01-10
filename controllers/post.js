@@ -13,9 +13,19 @@ export const placeOrder = async (req, res) => {
 
     for (let i = 0; i < order.length; i++) {
       const item = {};
-      item.productId = order[i]._id;
+      item.product = order[i]._id;
       item.quantity = order[i].quantity;
       products.push(item);
+
+      const product = await Product.findOne({ _id: order[i]._id });
+      Product.findByIdAndUpdate(product._id, {
+        supply: Number(product.supply) - Number(order[i].quantity),
+      }).catch((error) =>
+        res.status(StatusCodes.BAD_REQUEST).json({
+          error: error.message,
+          message: `${prod.name} does not exist!`,
+        })
+      );
     }
 
     const newOrder = new Order({

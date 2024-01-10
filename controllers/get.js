@@ -45,7 +45,7 @@ export const getAllOrders = async (req, res) => {
 
     const orders = await Order.find({ status: status })
       .populate("address")
-      .populate("order.productId");
+      .populate("order.product");
 
     return res.status(StatusCodes.OK).json(orders);
   } catch (error) {
@@ -60,7 +60,7 @@ export const getOrders = async (req, res) => {
       userId: id,
     })
       .populate("address")
-      .populate("order.productId");
+      .populate("order.product");
 
     return res.status(StatusCodes.OK).json(orders);
   } catch (error) {
