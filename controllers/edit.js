@@ -7,6 +7,7 @@ import { promises as fsPromises } from "fs";
 import { fileURLToPath } from "url";
 import path, { dirname, join } from "path";
 import Order from "../models/Orders.js";
+import CanceledOrder from "../models/CanceledOrders.js";
 
 export const updateStatus = async (req, res) => {
   try {
@@ -50,6 +51,9 @@ export const cancelOrder = async (req, res) => {
     const isOrder = await Order.findOne({ _id: orderId });
 
     if (isOrder) {
+      console.log(isOrder);
+      const newCanceledOrder = new CanceledOrder(isOrder);
+      await newCanceledOrder.save();
       const order = isOrder.order;
       for (let i = 0; i < order.length; i++) {
         const product = await Product.findOne({ _id: order[i].product });
