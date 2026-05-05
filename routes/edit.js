@@ -9,6 +9,7 @@ import {
   cancelOrder,
   updateStatus,
   toggleCoupon,
+  toggleUserActive,
 } from "../controllers/edit.js";
 import authenticateToken from "../middleware/authenticateToken.js";
 import upload from "../middleware/imageUpload.js";
@@ -33,5 +34,6 @@ router.patch("/addresses/:id", authenticateToken, editAddress);
 router.delete("/addresses/:id", authenticateToken, deleteAddress);
 router.delete("/orders/:id", authenticateToken, cancelOrder);
 router.patch("/coupon/:id", authenticateToken, toggleCoupon);
+router.patch("/users/:id/active", authenticateToken, toggleUserActive);
 
 export default router;

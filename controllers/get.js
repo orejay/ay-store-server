@@ -6,6 +6,8 @@ import Address from "../models/Address.js";
 import Order from "../models/Orders.js";
 import Wishlist from "../models/Wishlist.js";
 import Coupon from "../models/Coupon.js";
+import Message from "../models/Message.js";
+import Review from "../models/Review.js";
 import axios from "axios";
 
 export const veryPaystack = async (req, res) => {
@@ -37,6 +39,7 @@ export const getAllOrders = async (req, res) => {
   try {
     const { id } = req.user;
     const status = req.params.status;
+    const { page = 1, limit = 10 } = req.query;
 
     const user = await User.findOne({ _id: id });
 
@@ -45,11 +48,24 @@ export const getAllOrders = async (req, res) => {
         .status(StatusCodes.UNAUTHORIZED)
         .json({ message: "Unauthorized to perform this action" });
 
-    const orders = await Order.find({ status: status })
-      .populate("address")
-      .populate("order.product");
+    const filter = { status };
+    const skip = (Number(page) - 1) * Number(limit);
+    const [orders, total] = await Promise.all([
+      Order.find(filter)
+        .populate("address")
+        .populate("order.product")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Order.countDocuments(filter),
+    ]);
 
-    return res.status(StatusCodes.OK).json(orders);
+    return res.status(StatusCodes.OK).json({
+      orders,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+    });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
@@ -110,15 +126,23 @@ export const getAddress = async (req, res) => {
 
 export const searchProducts = async (req, res) => {
   try {
-    const { name } = req.query;
+    const { name, page = 1, limit = 20 } = req.query;
     const filter = {};
 
     if (name) filter.name = { $regex: name, $options: "i" };
-    const products = await Product.find(filter, { name: 1 });
 
-    return res
-      .status(StatusCodes.OK)
-      .json({ products, total: products.length });
+    const skip = (Number(page) - 1) * Number(limit);
+    const [products, total] = await Promise.all([
+      Product.find(filter).skip(skip).limit(Number(limit)),
+      Product.countDocuments(filter),
+    ]);
+
+    return res.status(StatusCodes.OK).json({
+      products,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+    });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
@@ -126,8 +150,10 @@ export const searchProducts = async (req, res) => {
 
 export const getProducts = async (req, res) => {
   try {
-    const { category, priceRange, discount, rating, gender, brand, tags, sort } =
-      req.query;
+    const {
+      category, priceRange, discount, rating, gender, brand, tags, sort,
+      page = 1, limit = 20,
+    } = req.query;
     const filter = {};
 
     if (category) {
@@ -158,11 +184,18 @@ export const getProducts = async (req, res) => {
     };
     const sortOption = sortMap[sort] || { createdAt: -1 };
 
-    const products = await Product.find(filter).sort(sortOption);
+    const skip = (Number(page) - 1) * Number(limit);
+    const [products, total] = await Promise.all([
+      Product.find(filter).sort(sortOption).skip(skip).limit(Number(limit)),
+      Product.countDocuments(filter),
+    ]);
 
-    return res
-      .status(StatusCodes.OK)
-      .json({ products, total: products.length });
+    return res.status(StatusCodes.OK).json({
+      products,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+    });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
@@ -171,11 +204,21 @@ export const getProducts = async (req, res) => {
 export const getProductsByCategory = async (req, res) => {
   try {
     const category = req.params.category;
-    const products = await Product.find({ category: category });
+    const { page = 1, limit = 20 } = req.query;
+    const filter = { category };
 
-    return res
-      .status(StatusCodes.OK)
-      .json({ products, total: products.length });
+    const skip = (Number(page) - 1) * Number(limit);
+    const [products, total] = await Promise.all([
+      Product.find(filter).skip(skip).limit(Number(limit)),
+      Product.countDocuments(filter),
+    ]);
+
+    return res.status(StatusCodes.OK).json({
+      products,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+    });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
@@ -309,9 +352,31 @@ export const getDashboardStats = async (req, res) => {
   }
 };
 
+export const getReviews = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const reviews = await Review.find({ productId })
+      .populate("userId", "firstName lastName")
+      .sort({ createdAt: -1 });
+    return res.status(StatusCodes.OK).json({ reviews, total: reviews.length });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const getMessages = async (req, res) => {
+  try {
+    const messages = await Message.find().sort({ createdAt: -1 });
+    return res.status(StatusCodes.OK).json({ messages, total: messages.length });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const getUsers = async (req, res) => {
   try {
     const { id } = req.user;
+    const { page = 1, limit = 20 } = req.query;
 
     const user = await User.findOne({ _id: id });
 
@@ -320,9 +385,18 @@ export const getUsers = async (req, res) => {
         .status(StatusCodes.UNAUTHORIZED)
         .json({ message: "Unauthorized to perform this action" });
 
-    const users = await User.find().select("-password");
+    const skip = (Number(page) - 1) * Number(limit);
+    const [users, total] = await Promise.all([
+      User.find().select("-password").skip(skip).limit(Number(limit)),
+      User.countDocuments(),
+    ]);
 
-    return res.status(StatusCodes.OK).json(users);
+    return res.status(StatusCodes.OK).json({
+      users,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+    });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }

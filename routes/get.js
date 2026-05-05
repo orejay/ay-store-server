@@ -17,6 +17,8 @@ import {
   getWishlist,
   validateCoupon,
   getCoupons,
+  getMessages,
+  getReviews,
 } from "../controllers/get.js";
 
 const router = express.Router();
@@ -38,5 +40,7 @@ router.get("/products/:category", getProductsByCategory);
 router.get("/wishlist", authenticateToken, getWishlist);
 router.get("/coupon/:code", validateCoupon);
 router.get("/coupons", authenticateToken, getCoupons);
+router.get("/messages", authenticateToken, getMessages);
+router.get("/reviews/:productId", getReviews);
 
 export default router;

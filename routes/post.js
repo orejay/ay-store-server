@@ -1,5 +1,5 @@
 import express from "express";
-import { addAddress, addProduct, placeOrder, toggleWishlist, addCoupon } from "../controllers/post.js";
+import { addAddress, addProduct, placeOrder, toggleWishlist, addCoupon, broadcastMessage, postReview } from "../controllers/post.js";
 import authenticateToken from "../middleware/authenticateToken.js";
 import upload from "../middleware/imageUpload.js";
 
@@ -10,5 +10,7 @@ router.post("/addresses", authenticateToken, addAddress);
 router.post("/order", authenticateToken, placeOrder);
 router.post("/wishlist/:productId", authenticateToken, toggleWishlist);
 router.post("/coupon", authenticateToken, addCoupon);
+router.post("/message", authenticateToken, broadcastMessage);
+router.post("/review/:productId", authenticateToken, postReview);
 
 export default router;

@@ -409,6 +409,23 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
+export const toggleUserActive = async (req, res) => {
+  try {
+    const { id: requesterId } = req.user;
+    const requester = await User.findById(requesterId);
+    if (!["admin", "superadmin"].includes(requester.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const target = await User.findById(req.params.id);
+    if (!target)
+      return res.status(StatusCodes.NOT_FOUND).json({ message: "User not found." });
+    target.active = !target.active;
+    await target.save();
+    return res.status(StatusCodes.OK).json({ active: target.active });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const toggleCoupon = async (req, res) => {
   try {
     const { id } = req.user;

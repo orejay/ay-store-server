@@ -6,11 +6,13 @@ import Order from "../models/Orders.js";
 import PaystackPayments from "../models/PaystackPayments.js";
 import Wishlist from "../models/Wishlist.js";
 import Coupon from "../models/Coupon.js";
+import Message from "../models/Message.js";
+import Review from "../models/Review.js";
 
 export const placeOrder = async (req, res) => {
   try {
     const { id } = req.user;
-    const { order, address, instructions, price, ref } = req.body;
+    const { order, address, instructions, price, ref, couponCode } = req.body;
     const products = [];
 
     for (let i = 0; i < order.length; i++) {
@@ -38,10 +40,34 @@ export const placeOrder = async (req, res) => {
       }
     }
 
+    let discountAmount = 0;
+    let appliedCoupon = null;
+
+    if (couponCode) {
+      const coupon = await Coupon.findOne({
+        code: couponCode.toUpperCase(),
+        active: true,
+      });
+      if (!coupon)
+        return res
+          .status(StatusCodes.NOT_FOUND)
+          .json({ message: "Coupon not found or inactive." });
+      if (coupon.expiresAt && coupon.expiresAt < new Date())
+        return res
+          .status(StatusCodes.GONE)
+          .json({ message: "Coupon has expired." });
+      discountAmount = parseFloat(
+        ((Number(price) * coupon.discountPercent) / 100).toFixed(2)
+      );
+      appliedCoupon = coupon.code;
+    }
+
     const newOrder = new Order({
       userId: id,
       order: products,
       price: price,
+      discountAmount,
+      couponCode: appliedCoupon,
       address: address._id,
       instructions: instructions,
     });
@@ -180,6 +206,53 @@ export const toggleWishlist = async (req, res) => {
     }
     await wishlist.save();
     return res.status(StatusCodes.OK).json({ saved: !isSaved });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const postReview = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const { productId } = req.params;
+    const { rating, text } = req.body;
+
+    if (!rating || !text)
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: "Rating and text are required." });
+
+    const product = await Product.findById(productId);
+    if (!product)
+      return res.status(StatusCodes.NOT_FOUND).json({ message: "Product not found." });
+
+    const review = new Review({ userId: id, productId, rating: Number(rating), text });
+    await review.save();
+
+    // Recalculate product average rating
+    const all = await Review.find({ productId });
+    const avg = all.reduce((sum, r) => sum + r.rating, 0) / all.length;
+    await Product.findByIdAndUpdate(productId, { rating: Math.round(avg * 10) / 10 });
+
+    const populated = await review.populate("userId", "firstName lastName");
+    return res.status(StatusCodes.CREATED).json({ review: populated });
+  } catch (error) {
+    if (error.code === 11000)
+      return res.status(StatusCodes.CONFLICT).json({ message: "You have already reviewed this product." });
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const broadcastMessage = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const { subject, body } = req.body;
+    if (!subject || !body)
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: "Subject and body are required." });
+    const message = new Message({ subject, body });
+    await message.save();
+    return res.status(StatusCodes.CREATED).json({ message: "Message sent.", data: message });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
