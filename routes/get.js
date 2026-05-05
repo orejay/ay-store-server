@@ -5,6 +5,7 @@ import {
   getAddresses,
   getAllOrders,
   getDefaultAddress,
+  getDashboardStats,
   getFeaturedProducts,
   getOrders,
   getProductById,
@@ -20,6 +21,7 @@ import {
 
 const router = express.Router();
 
+router.get("/dashboard", authenticateToken, getDashboardStats);
 router.get("/products/search", searchProducts);
 router.get("/products/featured", getFeaturedProducts);
 router.get("/verify-paystack/:ref", authenticateToken, veryPaystack);

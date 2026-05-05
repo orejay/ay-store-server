@@ -242,6 +242,73 @@ export const getCoupons = async (req, res) => {
   }
 };
 
+export const getDashboardStats = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Orders by status
+    const statusCounts = await Order.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+    const ordersByStatus = { new: 0, processing: 0, shipped: 0, delivered: 0, completed: 0 };
+    statusCounts.forEach(({ _id, count }) => { if (_id in ordersByStatus) ordersByStatus[_id] = count; });
+
+    // Total revenue from completed/delivered orders (price stored as string on order)
+    const allOrders = await Order.find({ status: { $in: ["completed", "delivered"] } }).select("price createdAt");
+    const totalRevenue = allOrders.reduce((sum, o) => sum + (parseFloat(o.price) || 0), 0);
+    const revenueThisMonth = allOrders
+      .filter((o) => new Date(o.createdAt) >= startOfMonth)
+      .reduce((sum, o) => sum + (parseFloat(o.price) || 0), 0);
+
+    // Top-selling products
+    const topProducts = await Order.aggregate([
+      { $unwind: "$order" },
+      { $group: { _id: "$order.product", totalSold: { $sum: "$order.quantity" } } },
+      { $sort: { totalSold: -1 } },
+      { $limit: 5 },
+      { $lookup: { from: "products", localField: "_id", foreignField: "_id", as: "product" } },
+      { $unwind: "$product" },
+      { $project: { _id: 0, name: "$product.name", totalSold: 1, price: "$product.price", category: "$product.category" } },
+    ]);
+
+    // User counts
+    const totalUsers = await User.countDocuments({ role: "user" });
+    const newUsersThisMonth = await User.countDocuments({ role: "user", createdAt: { $gte: startOfMonth } });
+
+    // Low-stock products
+    const lowStockProducts = await Product.find({ supply: { $lt: 10 } })
+      .sort({ supply: 1 })
+      .limit(8)
+      .select("name supply category price");
+
+    // Recent orders
+    const recentOrders = await Order.find()
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .populate("order.product", "name price discount")
+      .populate("address", "city state")
+      .select("status price createdAt order address");
+
+    return res.status(StatusCodes.OK).json({
+      revenue: { total: totalRevenue, thisMonth: revenueThisMonth },
+      ordersByStatus,
+      topProducts,
+      totalUsers,
+      newUsersThisMonth,
+      lowStockProducts,
+      recentOrders,
+    });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const getUsers = async (req, res) => {
   try {
     const { id } = req.user;
