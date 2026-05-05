@@ -1,6 +1,7 @@
 import Address from "../models/Address.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
+import Coupon from "../models/Coupon.js";
 import jwt from "jsonwebtoken";
 import { StatusCodes } from "http-status-codes";
 import { promises as fsPromises } from "fs";
@@ -62,7 +63,7 @@ export const cancelOrder = async (req, res) => {
         }).catch((error) =>
           res.status(StatusCodes.BAD_REQUEST).json({
             error: error.message,
-            message: `${prod.name} does not exist!`,
+            message: `${product.name} does not exist!`,
           })
         );
       }
@@ -129,7 +130,7 @@ export const editUser = async (req, res) => {
     const { id } = req.user;
     const isUser = await User.find({ _id: id });
     const { firstName, lastName, email, phoneNumber } = req.body;
-    const jwtExpiration = process.env.JWT_EXPIRATION;
+    const jwtExpiration = process.env.JWT_EXPIRATION || 604800;
     const jwtSecret = process.env.JWT_SECRET;
     const token = jwt.sign({ id: id }, jwtSecret, {
       expiresIn: Number(jwtExpiration),
@@ -300,6 +301,17 @@ export const editProduct = async (req, res) => {
     if (product.supply !== "") filter.supply = Number(product.supply);
     if (product.description !== "") filter.description = product.description;
     if (product.discount !== "") filter.discount = Number(product.discount);
+    if (product.gender) filter.gender = product.gender;
+    if (product.brand !== undefined) filter.brand = product.brand;
+    if (product.tags !== undefined)
+      filter.tags = product.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+    if (product.featured !== undefined) filter.featured = product.featured === "true";
+    if (product.variants !== undefined) {
+      try { filter.variants = JSON.parse(product.variants); } catch (_) {}
+    }
     if (req.file) {
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = dirname(__filename);
@@ -336,7 +348,7 @@ export const editProduct = async (req, res) => {
         .catch((error) =>
           res.status(StatusCodes.BAD_REQUEST).json({
             error: error.message,
-            message: `${prod.name} does not exist!`,
+            message: `${product.name} does not exist!`,
           })
         );
     } else {
@@ -392,6 +404,23 @@ export const deleteProduct = async (req, res) => {
           res.status(StatusCodes.BAD_REQUEST).json({ message: error.message })
         );
     }
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const toggleCoupon = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const coupon = await Coupon.findById(req.params.id);
+    if (!coupon)
+      return res.status(StatusCodes.NOT_FOUND).json({ message: "Coupon not found." });
+    coupon.active = !coupon.active;
+    await coupon.save();
+    return res.status(StatusCodes.OK).json({ message: "Coupon updated.", coupon });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }

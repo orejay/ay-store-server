@@ -22,8 +22,24 @@ const ProductSchema = mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["skin", "face", "lips", "perfumery", "household", "decorative"],
       required: true,
+    },
+    gender: {
+      type: String,
+      enum: ["men", "women", "unisex", "none"],
+      default: "none",
+    },
+    brand: {
+      type: String,
+      default: "",
+    },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    featured: {
+      type: Boolean,
+      default: false,
     },
     rating: {
       type: Number,
@@ -33,6 +49,14 @@ const ProductSchema = mongoose.Schema(
       type: Number,
       default: 0,
     },
+    variants: [
+      {
+        size: { type: String, default: "" },
+        color: { type: String, default: "" },
+        stock: { type: Number, default: 0 },
+      },
+    ],
+    images: { type: [String], default: [] },
   },
   { timestamps: true }
 );

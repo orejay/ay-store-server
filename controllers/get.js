@@ -4,6 +4,8 @@ import ProductStat from "../models/ProductStat.js";
 import { StatusCodes } from "http-status-codes";
 import Address from "../models/Address.js";
 import Order from "../models/Orders.js";
+import Wishlist from "../models/Wishlist.js";
+import Coupon from "../models/Coupon.js";
 import axios from "axios";
 
 export const veryPaystack = async (req, res) => {
@@ -124,16 +126,15 @@ export const searchProducts = async (req, res) => {
 
 export const getProducts = async (req, res) => {
   try {
-    const { category, priceRange, discount, rating } = req.query;
+    const { category, priceRange, discount, rating, gender, brand, tags, sort } =
+      req.query;
     const filter = {};
 
     if (category) {
       const categories = category.split(",");
-
       filter.category = { $in: categories };
     }
     if (discount === "true") filter.discount = { $gte: 1 };
-    console.log(discount);
     if (priceRange) {
       const [minPrice, maxPrice] = priceRange.split("-");
       filter.price = { $gte: minPrice, $lte: maxPrice };
@@ -142,18 +143,22 @@ export const getProducts = async (req, res) => {
       const [minRating, maxRating] = rating.split("-");
       filter.rating = { $gte: minRating, $lte: maxRating };
     }
+    if (gender && gender !== "all") filter.gender = gender;
+    if (brand) filter.brand = { $regex: brand, $options: "i" };
+    if (tags) {
+      const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
+      if (tagList.length) filter.tags = { $in: tagList };
+    }
 
-    const products = await Product.find(filter, {
-      name: 1,
-      price: 1,
-      category: 1,
-      rating: 1,
-      description: 1,
-      discount: 1,
-      imageName: 1,
-      imagePath: 1,
-      supply: 1,
-    });
+    const sortMap = {
+      price_asc: { price: 1 },
+      price_desc: { price: -1 },
+      newest: { createdAt: -1 },
+      top_rated: { rating: -1 },
+    };
+    const sortOption = sortMap[sort] || { createdAt: -1 };
+
+    const products = await Product.find(filter).sort(sortOption);
 
     return res
       .status(StatusCodes.OK)
@@ -171,6 +176,67 @@ export const getProductsByCategory = async (req, res) => {
     return res
       .status(StatusCodes.OK)
       .json({ products, total: products.length });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const getFeaturedProducts = async (req, res) => {
+  try {
+    const products = await Product.find({ featured: true });
+    return res
+      .status(StatusCodes.OK)
+      .json({ products, total: products.length });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const getProductById = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product)
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ message: "Product not found" });
+    return res.status(StatusCodes.OK).json(product);
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const getWishlist = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const wishlist = await Wishlist.findOne({ userId: id }).populate("productIds");
+    return res.status(StatusCodes.OK).json({ products: wishlist?.productIds || [] });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const validateCoupon = async (req, res) => {
+  try {
+    const code = req.params.code.toUpperCase();
+    const coupon = await Coupon.findOne({ code, active: true });
+    if (!coupon)
+      return res.status(StatusCodes.NOT_FOUND).json({ message: "Coupon not found or inactive." });
+    if (coupon.expiresAt && coupon.expiresAt < new Date())
+      return res.status(StatusCodes.GONE).json({ message: "Coupon has expired." });
+    return res.status(StatusCodes.OK).json({ code: coupon.code, discountPercent: coupon.discountPercent });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const getCoupons = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const coupons = await Coupon.find().sort({ createdAt: -1 });
+    return res.status(StatusCodes.OK).json(coupons);
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }

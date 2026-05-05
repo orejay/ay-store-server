@@ -1,4 +1,4 @@
 module.exports = {
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiration: 300,
+  jwtExpiration: 604800,
 };

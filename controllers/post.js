@@ -4,6 +4,8 @@ import User from "../models/User.js";
 import Address from "../models/Address.js";
 import Order from "../models/Orders.js";
 import PaystackPayments from "../models/PaystackPayments.js";
+import Wishlist from "../models/Wishlist.js";
+import Coupon from "../models/Coupon.js";
 
 export const placeOrder = async (req, res) => {
   try {
@@ -15,17 +17,25 @@ export const placeOrder = async (req, res) => {
       const item = {};
       item.product = order[i]._id;
       item.quantity = order[i].quantity;
+      if (order[i].variantId) item.variantId = order[i].variantId;
       products.push(item);
 
-      const product = await Product.findOne({ _id: order[i]._id });
-      Product.findByIdAndUpdate(product._id, {
-        supply: Number(product.supply) - Number(order[i].quantity),
-      }).catch((error) =>
-        res.status(StatusCodes.BAD_REQUEST).json({
-          error: error.message,
-          message: `${prod.name} does not exist!`,
-        })
-      );
+      if (order[i].variantId) {
+        await Product.updateOne(
+          { _id: order[i]._id, "variants._id": order[i].variantId },
+          { $inc: { "variants.$.stock": -Number(order[i].quantity) } }
+        );
+      } else {
+        const product = await Product.findOne({ _id: order[i]._id });
+        Product.findByIdAndUpdate(product._id, {
+          supply: Number(product.supply) - Number(order[i].quantity),
+        }).catch((error) =>
+          res.status(StatusCodes.BAD_REQUEST).json({
+            error: error.message,
+            message: `${product.name} does not exist!`,
+          })
+        );
+      }
     }
 
     const newOrder = new Order({
@@ -115,16 +125,31 @@ export const addProduct = async (req, res) => {
         .status(StatusCodes.CONFLICT)
         .json({ message: `${product.name} already exists!` });
 
+    const files = req.files || (req.file ? [req.file] : []);
+    const imageNames = files.map((f) => f.filename);
+    let variants = [];
+    if (product.variants) {
+      try { variants = JSON.parse(product.variants); } catch (_) {}
+    }
+
     const newProduct = new Product({
       name: product.name,
       price: Number(product.price),
-      imageName: req.file.filename,
-      imagePath: req.file.path,
+      imageName: imageNames[0] || "",
+      imagePath: files[0]?.path || "",
+      images: imageNames,
       discount: Number(product.discount),
       description: product.description,
       category: product.category,
+      gender: product.gender || "none",
+      brand: product.brand || "",
+      tags: product.tags
+        ? product.tags.split(",").map((t) => t.trim()).filter(Boolean)
+        : [],
+      featured: product.featured === "true",
       rating: 0,
       supply: Number(product.supply),
+      variants,
     });
 
     await newProduct.save();
@@ -132,6 +157,51 @@ export const addProduct = async (req, res) => {
       message: `${product.name} added successfully!`,
       product: newProduct,
     });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const toggleWishlist = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const productId = req.params.productId;
+    let wishlist = await Wishlist.findOne({ userId: id });
+    if (!wishlist) {
+      wishlist = new Wishlist({ userId: id, productIds: [productId] });
+      await wishlist.save();
+      return res.status(StatusCodes.CREATED).json({ saved: true });
+    }
+    const isSaved = wishlist.productIds.some((p) => p.toString() === productId);
+    if (isSaved) {
+      wishlist.productIds = wishlist.productIds.filter((p) => p.toString() !== productId);
+    } else {
+      wishlist.productIds.push(productId);
+    }
+    await wishlist.save();
+    return res.status(StatusCodes.OK).json({ saved: !isSaved });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const addCoupon = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const { code, discountPercent, expiresAt } = req.body;
+    const exists = await Coupon.findOne({ code: code.toUpperCase() });
+    if (exists)
+      return res.status(StatusCodes.CONFLICT).json({ message: "Coupon code already exists." });
+    const coupon = new Coupon({
+      code: code.toUpperCase(),
+      discountPercent: Number(discountPercent),
+      expiresAt: expiresAt || undefined,
+    });
+    await coupon.save();
+    return res.status(StatusCodes.CREATED).json({ message: "Coupon created.", coupon });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }

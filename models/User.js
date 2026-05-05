@@ -39,6 +39,8 @@ const UserSchema = mongoose.Schema(
       enum: ["user", "admin", "superadmin"],
       default: "user",
     },
+    resetToken: String,
+    resetTokenExpiry: Date,
   },
   { timestamps: true }
 );

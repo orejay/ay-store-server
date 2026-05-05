@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import { StatusCodes } from "http-status-codes";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 const saltRounds = process.env.SALT_ROUNDS;
 
@@ -58,7 +59,7 @@ export const changePassword = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const jwtExpiration = process.env.JWT_EXPIRATION;
+    const jwtExpiration = process.env.JWT_EXPIRATION || 604800;
     const jwtSecret = process.env.JWT_SECRET;
 
     const users = await User.find({
@@ -96,6 +97,72 @@ export const login = async (req, res) => {
     return res
       .status(StatusCodes.BAD_REQUEST)
       .json({ message: `Unable to authenticate user! ${error.message}` });
+  }
+};
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const users = await User.find({
+      email: { $regex: `^${email}$`, $options: "i" },
+    });
+
+    if (users.length < 1)
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ message: "No account found with that email." });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await User.findByIdAndUpdate(users[0]._id, {
+      resetToken: token,
+      resetTokenExpiry: expiry,
+    });
+
+    // In production, email the reset link. For now, return the token.
+    return res.status(StatusCodes.OK).json({
+      message: "Reset token generated.",
+      resetToken: token,
+    });
+  } catch (error) {
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: error.message });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    const saltRounds = process.env.SALT_ROUNDS;
+
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: new Date() },
+    });
+
+    if (!user)
+      return res
+        .status(StatusCodes.BAD_REQUEST)
+        .json({ message: "Invalid or expired reset token." });
+
+    const salt = await bcrypt.genSalt(saltRounds);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    await User.findByIdAndUpdate(user._id, {
+      password: hashedPassword,
+      resetToken: null,
+      resetTokenExpiry: null,
+    });
+
+    return res
+      .status(StatusCodes.OK)
+      .json({ message: "Password reset successfully." });
+  } catch (error) {
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: error.message });
   }
 };
 
@@ -141,7 +208,7 @@ export const signup = async (req, res) => {
       res.status(StatusCodes.CREATED).json({
         message: `user created successfully!`,
         userData: {
-          id: user._id,
+          id: newUser._id,
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
