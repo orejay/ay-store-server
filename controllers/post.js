@@ -12,7 +12,7 @@ import Review from "../models/Review.js";
 export const placeOrder = async (req, res) => {
   try {
     const { id } = req.user;
-    const { order, address, instructions, price, ref, couponCode } = req.body;
+    const { order, address, instructions, price, ref, couponCode, shippingMethod, shippingFee } = req.body;
     const products = [];
 
     for (let i = 0; i < order.length; i++) {
@@ -70,6 +70,8 @@ export const placeOrder = async (req, res) => {
       couponCode: appliedCoupon,
       address: address._id,
       instructions: instructions,
+      shippingMethod: shippingMethod || "standard",
+      shippingFee: shippingFee || 1500,
     });
 
     await newOrder.save();

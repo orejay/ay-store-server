@@ -8,6 +8,7 @@ import {
   getDashboardStats,
   getFeaturedProducts,
   getOrders,
+  getOrderById,
   getProductById,
   getProducts,
   getProductsByCategory,
@@ -29,6 +30,7 @@ router.get("/products/featured", getFeaturedProducts);
 router.get("/verify-paystack/:ref", authenticateToken, veryPaystack);
 router.get("/users", authenticateToken, getUsers);
 router.get("/orders", authenticateToken, getOrders);
+router.get("/orders/:id", authenticateToken, getOrderById);
 router.get("/allorders/:status", authenticateToken, getAllOrders);
 router.get("/products/filter", getProducts);
 router.get("/products", authenticateToken, getProducts);

@@ -15,6 +15,8 @@ const OrdersSchema = mongoose.Schema(
     couponCode: { type: String, default: null },
     address: { type: mongoose.Types.ObjectId, ref: "Address" },
     instructions: String,
+    shippingMethod: { type: String, enum: ["standard", "express"], default: "standard" },
+    shippingFee: { type: Number, default: 1500 },
     status: {
       type: String,
       enum: ["new", "processing", "shipped", "delivered", "completed"],

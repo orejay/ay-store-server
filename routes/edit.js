@@ -10,6 +10,7 @@ import {
   updateStatus,
   toggleCoupon,
   toggleUserActive,
+  toggleUserRole,
 } from "../controllers/edit.js";
 import authenticateToken from "../middleware/authenticateToken.js";
 import upload from "../middleware/imageUpload.js";
@@ -35,5 +36,6 @@ router.delete("/addresses/:id", authenticateToken, deleteAddress);
 router.delete("/orders/:id", authenticateToken, cancelOrder);
 router.patch("/coupon/:id", authenticateToken, toggleCoupon);
 router.patch("/users/:id/active", authenticateToken, toggleUserActive);
+router.patch("/users/:id/role", authenticateToken, toggleUserRole);
 
 export default router;

@@ -426,6 +426,27 @@ export const toggleUserActive = async (req, res) => {
   }
 };
 
+export const toggleUserRole = async (req, res) => {
+  try {
+    const { id: requesterId } = req.user;
+    const requester = await User.findById(requesterId);
+    if (requester.role !== "superadmin")
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Only superadmins can change roles." });
+    if (requesterId === req.params.id)
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: "You cannot change your own role." });
+    const target = await User.findById(req.params.id);
+    if (!target)
+      return res.status(StatusCodes.NOT_FOUND).json({ message: "User not found." });
+    if (target.role === "superadmin")
+      return res.status(StatusCodes.FORBIDDEN).json({ message: "Cannot change the role of another superadmin." });
+    target.role = target.role === "admin" ? "user" : "admin";
+    await target.save();
+    return res.status(StatusCodes.OK).json({ role: target.role });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const toggleCoupon = async (req, res) => {
   try {
     const { id } = req.user;

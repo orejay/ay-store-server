@@ -94,6 +94,20 @@ export const getOrders = async (req, res) => {
   }
 };
 
+export const getOrderById = async (req, res) => {
+  try {
+    const { id: userId } = req.user;
+    const order = await Order.findOne({ _id: req.params.id, userId })
+      .populate("address")
+      .populate("order.product");
+    if (!order)
+      return res.status(StatusCodes.NOT_FOUND).json({ message: "Order not found." });
+    return res.status(StatusCodes.OK).json(order);
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
 export const getAddresses = async (req, res) => {
   try {
     const { id } = req.user;
