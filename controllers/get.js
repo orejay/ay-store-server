@@ -39,16 +39,24 @@ export const getAllOrders = async (req, res) => {
   try {
     const { id } = req.user;
     const status = req.params.status;
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 20, from, to } = req.query;
 
     const user = await User.findOne({ _id: id });
-
     if (!["admin", "superadmin"].includes(user.role))
-      return res
-        .status(StatusCodes.UNAUTHORIZED)
-        .json({ message: "Unauthorized to perform this action" });
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized to perform this action" });
 
-    const filter = { status };
+    const filter = status === "all" ? {} : { status };
+
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = new Date(from);
+      if (to) {
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = end;
+      }
+    }
+
     const skip = (Number(page) - 1) * Number(limit);
     const [orders, total] = await Promise.all([
       Order.find(filter)
