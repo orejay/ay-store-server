@@ -8,6 +8,8 @@ import Wishlist from "../models/Wishlist.js";
 import Coupon from "../models/Coupon.js";
 import Message from "../models/Message.js";
 import Review from "../models/Review.js";
+import DeliveryZone from "../models/DeliveryZone.js";
+import Subscriber from "../models/Subscriber.js";
 import axios from "axios";
 
 export const veryPaystack = async (req, res) => {
@@ -149,15 +151,40 @@ export const getAddress = async (req, res) => {
 export const searchProducts = async (req, res) => {
   try {
     const { name, page = 1, limit = 20 } = req.query;
-    const filter = {};
 
-    if (name) filter.name = { $regex: name, $options: "i" };
+    if (!name || name.trim().length < 1) {
+      return res.status(StatusCodes.OK).json({ products: [], total: 0, page: 1, totalPages: 0 });
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
-    const [products, total] = await Promise.all([
-      Product.find(filter).skip(skip).limit(Number(limit)),
-      Product.countDocuments(filter),
+
+    const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const chars = escapeRegex(name.trim()).split("");
+    const fuzzyPattern = chars.join(".*");
+    const fuzzyRegex = new RegExp(fuzzyPattern, "i");
+
+    const exactRegex = new RegExp(escapeRegex(name.trim()), "i");
+
+    const [exactResults, fuzzyResults] = await Promise.all([
+      Product.find({ name: { $regex: exactRegex } }),
+      Product.find({ name: { $regex: fuzzyRegex } }),
     ]);
+
+    const seenIds = new Set();
+    const combined = [];
+    for (const p of exactResults) {
+      seenIds.add(p._id.toString());
+      combined.push(p);
+    }
+    for (const p of fuzzyResults) {
+      if (!seenIds.has(p._id.toString())) {
+        seenIds.add(p._id.toString());
+        combined.push(p);
+      }
+    }
+
+    const total = combined.length;
+    const products = combined.slice(skip, skip + Number(limit));
 
     return res.status(StatusCodes.OK).json({
       products,
@@ -288,7 +315,13 @@ export const validateCoupon = async (req, res) => {
       return res.status(StatusCodes.NOT_FOUND).json({ message: "Coupon not found or inactive." });
     if (coupon.expiresAt && coupon.expiresAt < new Date())
       return res.status(StatusCodes.GONE).json({ message: "Coupon has expired." });
-    return res.status(StatusCodes.OK).json({ code: coupon.code, discountPercent: coupon.discountPercent });
+    if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses)
+      return res.status(StatusCodes.GONE).json({ message: "Coupon usage limit reached." });
+    return res.status(StatusCodes.OK).json({
+      code: coupon.code,
+      discountType: coupon.discountType,
+      discountValue: coupon.discountValue,
+    });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
@@ -317,21 +350,18 @@ export const getDashboardStats = async (req, res) => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Orders by status
     const statusCounts = await Order.aggregate([
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
     const ordersByStatus = { new: 0, processing: 0, shipped: 0, delivered: 0, completed: 0 };
     statusCounts.forEach(({ _id, count }) => { if (_id in ordersByStatus) ordersByStatus[_id] = count; });
 
-    // Total revenue from completed/delivered orders (price stored as string on order)
     const allOrders = await Order.find({ status: { $in: ["completed", "delivered"] } }).select("price createdAt");
     const totalRevenue = allOrders.reduce((sum, o) => sum + (parseFloat(o.price) || 0), 0);
     const revenueThisMonth = allOrders
       .filter((o) => new Date(o.createdAt) >= startOfMonth)
       .reduce((sum, o) => sum + (parseFloat(o.price) || 0), 0);
 
-    // Top-selling products
     const topProducts = await Order.aggregate([
       { $unwind: "$order" },
       { $group: { _id: "$order.product", totalSold: { $sum: "$order.quantity" } } },
@@ -342,17 +372,14 @@ export const getDashboardStats = async (req, res) => {
       { $project: { _id: 0, name: "$product.name", totalSold: 1, price: "$product.price", category: "$product.category" } },
     ]);
 
-    // User counts
     const totalUsers = await User.countDocuments({ role: "user" });
     const newUsersThisMonth = await User.countDocuments({ role: "user", createdAt: { $gte: startOfMonth } });
 
-    // Low-stock products
     const lowStockProducts = await Product.find({ supply: { $lt: 10 } })
       .sort({ supply: 1 })
       .limit(8)
       .select("name supply category price");
 
-    // Recent orders
     const recentOrders = await Order.find()
       .sort({ createdAt: -1 })
       .limit(6)
@@ -419,6 +446,28 @@ export const getUsers = async (req, res) => {
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),
     });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const getDeliveryZones = async (req, res) => {
+  try {
+    const zones = await DeliveryZone.find().sort({ price: 1 });
+    return res.status(StatusCodes.OK).json(zones);
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const getSubscribers = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const subscribers = await Subscriber.find({ active: true }).sort({ createdAt: -1 });
+    return res.status(StatusCodes.OK).json({ subscribers, total: subscribers.length });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }

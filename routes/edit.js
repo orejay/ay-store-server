@@ -11,6 +11,8 @@ import {
   toggleCoupon,
   toggleUserActive,
   toggleUserRole,
+  editDeliveryZone,
+  deleteDeliveryZone,
 } from "../controllers/edit.js";
 import authenticateToken from "../middleware/authenticateToken.js";
 import upload from "../middleware/imageUpload.js";
@@ -37,5 +39,7 @@ router.delete("/orders/:id", authenticateToken, cancelOrder);
 router.patch("/coupon/:id", authenticateToken, toggleCoupon);
 router.patch("/users/:id/active", authenticateToken, toggleUserActive);
 router.patch("/users/:id/role", authenticateToken, toggleUserRole);
+router.patch("/delivery-zone/:id", authenticateToken, editDeliveryZone);
+router.delete("/delivery-zone/:id", authenticateToken, deleteDeliveryZone);
 
 export default router;

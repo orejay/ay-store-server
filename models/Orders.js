@@ -22,6 +22,7 @@ const OrdersSchema = mongoose.Schema(
       enum: ["new", "processing", "shipped", "delivered", "completed"],
       default: "new",
     },
+    guestEmail: { type: String, default: null },
   },
   { timestamps: true }
 );

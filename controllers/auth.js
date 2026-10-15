@@ -3,6 +3,7 @@ import { StatusCodes } from "http-status-codes";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { sendResetEmail } from "../utils/email.js";
 
 const saltRounds = process.env.SALT_ROUNDS;
 
@@ -113,17 +114,17 @@ export const forgotPassword = async (req, res) => {
         .json({ message: "No account found with that email." });
 
     const token = crypto.randomBytes(32).toString("hex");
-    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expiry = new Date(Date.now() + 60 * 60 * 1000);
 
     await User.findByIdAndUpdate(users[0]._id, {
       resetToken: token,
       resetTokenExpiry: expiry,
     });
 
-    // In production, email the reset link. For now, return the token.
+    await sendResetEmail(users[0].email, token);
+
     return res.status(StatusCodes.OK).json({
-      message: "Reset token generated.",
-      resetToken: token,
+      message: "Password reset link sent to your email.",
     });
   } catch (error) {
     return res

@@ -2,6 +2,7 @@ import Address from "../models/Address.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
 import Coupon from "../models/Coupon.js";
+import DeliveryZone from "../models/DeliveryZone.js";
 import jwt from "jsonwebtoken";
 import { StatusCodes } from "http-status-codes";
 import { promises as fsPromises } from "fs";
@@ -459,6 +460,44 @@ export const toggleCoupon = async (req, res) => {
     coupon.active = !coupon.active;
     await coupon.save();
     return res.status(StatusCodes.OK).json({ message: "Coupon updated.", coupon });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const editDeliveryZone = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const zoneId = req.params.id;
+    const { name, price, areas, extraChargeAboveKg, extraChargeNote } = req.body;
+    const filter = {};
+    if (name) filter.name = name;
+    if (price !== undefined) filter.price = Number(price);
+    if (areas) filter.areas = areas;
+    if (extraChargeAboveKg !== undefined) filter.extraChargeAboveKg = Number(extraChargeAboveKg);
+    if (extraChargeNote !== undefined) filter.extraChargeNote = extraChargeNote;
+    const zone = await DeliveryZone.findByIdAndUpdate(zoneId, filter, { new: true });
+    if (!zone)
+      return res.status(StatusCodes.NOT_FOUND).json({ message: "Delivery zone not found." });
+    return res.status(StatusCodes.OK).json({ message: "Zone updated.", zone });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const deleteDeliveryZone = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const zone = await DeliveryZone.findByIdAndDelete(req.params.id);
+    if (!zone)
+      return res.status(StatusCodes.NOT_FOUND).json({ message: "Delivery zone not found." });
+    return res.status(StatusCodes.OK).json({ message: "Zone deleted." });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }

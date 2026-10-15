@@ -8,11 +8,17 @@ import Wishlist from "../models/Wishlist.js";
 import Coupon from "../models/Coupon.js";
 import Message from "../models/Message.js";
 import Review from "../models/Review.js";
+import DeliveryZone from "../models/DeliveryZone.js";
+import Subscriber from "../models/Subscriber.js";
+import { sendReceiptEmail, sendNewsletterEmail } from "../utils/email.js";
 
 export const placeOrder = async (req, res) => {
   try {
-    const { id } = req.user;
-    const { order, address, instructions, price, ref, couponCode, shippingMethod, shippingFee } = req.body;
+    const userId = req.user?.id || null;
+    const {
+      order, address, instructions, price, ref, couponCode,
+      shippingMethod, shippingFee, guestEmail, guestAddress,
+    } = req.body;
     const products = [];
 
     for (let i = 0; i < order.length; i++) {
@@ -56,33 +62,82 @@ export const placeOrder = async (req, res) => {
         return res
           .status(StatusCodes.GONE)
           .json({ message: "Coupon has expired." });
-      discountAmount = parseFloat(
-        ((Number(price) * coupon.discountPercent) / 100).toFixed(2)
-      );
+      if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses)
+        return res
+          .status(StatusCodes.GONE)
+          .json({ message: "Coupon usage limit reached." });
+
+      if (coupon.discountType === "percent") {
+        discountAmount = parseFloat(
+          ((Number(price) * coupon.discountValue) / 100).toFixed(2)
+        );
+      } else {
+        discountAmount = coupon.discountValue;
+      }
+
       appliedCoupon = coupon.code;
+      coupon.usedCount += 1;
+      await coupon.save();
+    }
+
+    let addressId = null;
+    let savedAddress = null;
+
+    if (guestAddress && !userId) {
+      const newAddr = new Address({
+        contactName: guestAddress.contactName,
+        phoneNumber: guestAddress.phoneNumber,
+        address: guestAddress.address,
+        city: guestAddress.city,
+        state: guestAddress.state,
+        country: guestAddress.country || "Nigeria",
+        isDefault: false,
+        user: null,
+      });
+      await newAddr.save();
+      addressId = newAddr._id;
+      savedAddress = newAddr;
+    } else if (address) {
+      addressId = address._id;
+      savedAddress = await Address.findById(address._id);
     }
 
     const newOrder = new Order({
-      userId: id,
+      userId: userId,
       order: products,
       price: price,
       discountAmount,
       couponCode: appliedCoupon,
-      address: address._id,
+      address: addressId,
       instructions: instructions,
       shippingMethod: shippingMethod || "standard",
       shippingFee: shippingFee || 1500,
+      guestEmail: guestEmail || null,
     });
 
     await newOrder.save();
 
     const newPaystackPayment = new PaystackPayments({
-      userId: id,
+      userId: userId,
       orderId: newOrder._id,
       paymentRef: ref,
     });
 
     await newPaystackPayment.save();
+
+    const populatedOrder = await Order.findById(newOrder._id).populate("order.product");
+    const itemDetails = populatedOrder.order.map((o) => ({
+      name: o.product?.name || "Product",
+      quantity: o.quantity,
+      price: o.product?.price || 0,
+    }));
+
+    const recipientEmail = guestEmail || (userId ? (await User.findById(userId))?.email : null);
+    if (recipientEmail) {
+      sendReceiptEmail(recipientEmail, newOrder, itemDetails, savedAddress).catch((err) =>
+        console.error("Receipt email error:", err.message)
+      );
+    }
 
     return res.status(StatusCodes.CREATED).json({ newOrder });
   } catch (error) {
@@ -229,7 +284,6 @@ export const postReview = async (req, res) => {
     const review = new Review({ userId: id, productId, rating: Number(rating), text });
     await review.save();
 
-    // Recalculate product average rating
     const all = await Review.find({ productId });
     const avg = all.reduce((sum, r) => sum + r.rating, 0) / all.length;
     await Product.findByIdAndUpdate(productId, { rating: Math.round(avg * 10) / 10 });
@@ -266,17 +320,99 @@ export const addCoupon = async (req, res) => {
     const user = await User.findById(id);
     if (!["admin", "superadmin"].includes(user.role))
       return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
-    const { code, discountPercent, expiresAt } = req.body;
+    const { code, discountType, discountValue, expiresAt, maxUses } = req.body;
     const exists = await Coupon.findOne({ code: code.toUpperCase() });
     if (exists)
       return res.status(StatusCodes.CONFLICT).json({ message: "Coupon code already exists." });
     const coupon = new Coupon({
       code: code.toUpperCase(),
-      discountPercent: Number(discountPercent),
+      discountType: discountType || "percent",
+      discountValue: Number(discountValue),
+      maxUses: maxUses ? Number(maxUses) : null,
       expiresAt: expiresAt || undefined,
     });
     await coupon.save();
     return res.status(StatusCodes.CREATED).json({ message: "Coupon created.", coupon });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const addDeliveryZone = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const { name, price, areas, extraChargeAboveKg, extraChargeNote } = req.body;
+    const zone = new DeliveryZone({
+      name,
+      price: Number(price),
+      areas: areas || [],
+      extraChargeAboveKg: extraChargeAboveKg || 5,
+      extraChargeNote: extraChargeNote || "",
+    });
+    await zone.save();
+    return res.status(StatusCodes.CREATED).json({ message: "Delivery zone created.", zone });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const subscribe = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email)
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: "Email is required." });
+    const existing = await Subscriber.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      if (!existing.active) {
+        existing.active = true;
+        await existing.save();
+        return res.status(StatusCodes.OK).json({ message: "Subscribed successfully." });
+      }
+      return res.status(StatusCodes.OK).json({ message: "Already subscribed." });
+    }
+    await new Subscriber({ email: email.toLowerCase() }).save();
+    return res.status(StatusCodes.CREATED).json({ message: "Subscribed successfully." });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const unsubscribe = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email)
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: "Email is required." });
+    await Subscriber.findOneAndUpdate({ email: email.toLowerCase() }, { active: false });
+    return res.status(StatusCodes.OK).json({ message: "Unsubscribed successfully." });
+  } catch (error) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
+  }
+};
+
+export const sendNewsletter = async (req, res) => {
+  try {
+    const { id } = req.user;
+    const user = await User.findById(id);
+    if (!["admin", "superadmin"].includes(user.role))
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: "Unauthorized." });
+    const { subject, body } = req.body;
+    if (!subject || !body)
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: "Subject and body are required." });
+
+    const subscribers = await Subscriber.find({ active: true });
+    let sent = 0;
+    for (const sub of subscribers) {
+      try {
+        await sendNewsletterEmail(sub.email, subject, body);
+        sent++;
+      } catch (err) {
+        console.error(`Failed to send to ${sub.email}:`, err.message);
+      }
+    }
+    return res.status(StatusCodes.OK).json({ message: `Newsletter sent to ${sent} subscribers.` });
   } catch (error) {
     return res.status(StatusCodes.BAD_REQUEST).json({ message: error.message });
   }
